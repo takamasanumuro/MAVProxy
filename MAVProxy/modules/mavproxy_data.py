@@ -1,18 +1,15 @@
 #!/usr/bin/env python
 
 import time, os
+
+import requests.auth
 from MAVProxy.modules.lib import mp_module
 from pymavlink import mavutil
 import sys, traceback
 import requests
 
 from MAVProxy.modules.lib import mp_settings
-import paho.mqtt.client as mqtt
-import json
-import numbers
 
-class MQTTException(Exception):
-    pass
 
 
 class CustomModule(mp_module.MPModule):
@@ -41,64 +38,102 @@ class CustomModule(mp_module.MPModule):
 
             latitude = float(m.lat) / 10000000
             longitude = float(m.lon) / 10000000
+            velocity_north_m_s = float(m.vx / 100)
+            velocity_east_m_s = float(m.vy / 100)
+            velocity = (velocity_north_m_s ** 2 + velocity_east_m_s ** 2) ** 0.5
+            heading = float(m.hdg / 100)
         
             payload = {
                 "latitude": latitude,
-                "longitude": longitude
+                "longitude": longitude,
+                "velocidade_norte": velocity_north_m_s,
+                "velocidade_leste": velocity_east_m_s,
+                "velocidade": velocity,
+                "heading": heading
             }
 
-            time_now = time.time()
-            send_to_api(payload)
-            time_after = time.time()
-            print(f"Time to send to API: {time_after - time_now:.2f}s")
+            send_to_influxDB(payload)
 
-            time_now = time.time()
-            send_to_scada(payload)
-            time_after = time.time()
-            print(f"Time to send to SCADA: {time_after - time_now:.2f}s")
-            #print(f"LAT: {latitude:.7f} | LON: {longitude:.7f}")
-
-        if m.get_type() == 'LOCAL_POSITION_NED':
-
-            velocity_north = m.vx
-            velocity_east = m.vyç
-            total_velocity = (velocity_north**2 + velocity_east**2)**0.5
+        if m.get_type() == 'ATTITUDE':
+            roll = float(m.roll)
+            pitch = float(m.pitch)
+            yaw = float(m.yaw)
+            rollspeed = float(m.rollspeed)
+            pitchspeed = float(m.pitchspeed)
+            yawspeed = float(m.yawspeed)
 
             payload = {
-                "velocidade": total_velocity
+                "roll": roll,
+                "pitch": pitch,
+                "yaw": yaw,
+                "rollspeed": rollspeed,
+                "pitchspeed": pitchspeed,
+                "yawspeed": yawspeed
             }
 
-            send_to_scada(payload)
+            send_to_influxDB(payload)
 
-            #print(f"VEL-N: {velocity_north:.2f}m/s | VEL-E: {velocity_east:.2f}m/s | VEL-T: {total_velocity:.2f}m/s")
 
 def init(mpstate):
     '''initialise module'''
     return CustomModule(mpstate)
 
-#Function to send a dictionary to a REST API
-def send_to_api(data):
-    url = "http://localhost:5000/api/marker"
-    payload = data
-    headers = { "Content-Type": "application/json" }
+def time_to_send(func):
+    def wrapper(*args, **kwargs):
+        time_now = time.time()
+        func(*args, **kwargs)
+        time_after = time.time()
+        print(f"Time to send to InfluxDB: {time_after - time_now:.2f}s")
+    return wrapper
 
-    try:
-        response = requests.post(url, json=payload, headers=headers)
-        print(f"Response: {response.text}")
-    except requests.exceptions.RequestException as e:
-        print(f"Error: {e}")
+def make_influx_url(ip, port, organization, bucket):
+    return f"http://{ip}:{port}/api/v2/write?org={organization}&bucket={bucket}&precision=s"
 
-def send_to_scada(data):
-    url = "http://44.221.0.169:8080/ScadaBR/httpds?"
+def make_line_protocol(bucket, tags, data):
+    line_protocol = f"{bucket},"
+    for key, value in tags.items():
+        line_protocol += f"{key}={value},"
+    line_protocol = line_protocol[:-1]  #remove last comma
+    line_protocol += " "
     for key, value in data.items():
-        url += f"{key}={value}&"
-    if url[-1] == "&":
-        url = url[:-1] #Remove the last "&"
+        line_protocol += f"{key}={value},"
+    line_protocol = line_protocol[:-1]  #remove last comma 
+
+    epoch_seconds = int(time.time())
+    line_protocol += f" {epoch_seconds}"
+
+    return line_protocol
+
+
+@time_to_send
+def send_to_influxDB(data):
+    organization = "Innomaker"
+    bucket = "Innoboat"
+    token = "gK8YfMaAl54lo2sgZLiM3Y5CQStHip-7mBe5vbhh1no86k72B4Hqo8Tj1qAL4Em-zGRUxGwBWLkQd1MR9foZ-g=="
+
+    ip = "44.221.0.169"
+    port = "8086"
+
+    url = make_influx_url(ip, port, organization, bucket)
+
+    tags = {
+        "source": "Pixhawk"
+    }
+
+    line_protocol = make_line_protocol(bucket, tags, data)
 
     try:
-        response = requests.get(url)
-        print(f"Response: {response.text}")
-    except requests.exceptions.RequestException as e:
-        print(f"Error: {e}")
-    #id=value&id2=value2
+
+        headers = {
+             "Authorization": f"Token {token}"
+        }
+
+        response = requests.post(url, data=line_protocol, headers=headers)
+        #Print nothing in case of 204 ( SUCCESS NO RESPONSE)
+        if response.status_code != 204:
+            print(f"Response: {response.text}")
+    except requests.exceptions.RequestException as exception:
+        print(f"Error: {exception}")
+
+
     

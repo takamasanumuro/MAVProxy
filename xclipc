@@ -1,0 +1,22 @@
+Defaulting to user installation because normal site-packages is not writeable
+Processing /home/innomaker/Documents/Innoprojects/MAVProxy
+  Preparing metadata (setup.py): started
+  Preparing metadata (setup.py): finished with status 'done'
+Requirement already satisfied: pymavlink>=2.4.14 in /home/innomaker/.local/lib/python3.10/site-packages (from MAVProxy==1.8.70) (2.4.41)
+Requirement already satisfied: pyserial>=3.0 in /home/innomaker/.local/lib/python3.10/site-packages (from MAVProxy==1.8.70) (3.5)
+Requirement already satisfied: numpy in /usr/lib/python3/dist-packages (from MAVProxy==1.8.70) (1.21.5)
+Requirement already satisfied: pynmeagps in /home/innomaker/.local/lib/python3.10/site-packages (from MAVProxy==1.8.70) (1.0.35)
+Requirement already satisfied: future in /home/innomaker/.local/lib/python3.10/site-packages (from pymavlink>=2.4.14->MAVProxy==1.8.70) (0.18.3)
+Requirement already satisfied: lxml in /home/innomaker/.local/lib/python3.10/site-packages (from pymavlink>=2.4.14->MAVProxy==1.8.70) (4.9.3)
+Building wheels for collected packages: MAVProxy
+  Building wheel for MAVProxy (setup.py): started
+  Building wheel for MAVProxy (setup.py): finished with status 'done'
+  Created wheel for MAVProxy: filename=MAVProxy-1.8.70-py3-none-any.whl size=898223 sha256=a9debdd32d1bb8e5bb12ab8b513ba32e822eb1813187624e85017b9f49cacb13
+  Stored in directory: /tmp/pip-ephem-wheel-cache-5kbifvgy/wheels/83/09/ec/7d02712ca2fb01ee3ab6f8e592ccf36dd2d299408edcbd8001
+Successfully built MAVProxy
+Installing collected packages: MAVProxy
+  Attempting uninstall: MAVProxy
+    Found existing installation: MAVProxy 1.8.70
+    Uninstalling MAVProxy-1.8.70:
+      Successfully uninstalled MAVProxy-1.8.70
+Successfully installed MAVProxy-1.8.70
