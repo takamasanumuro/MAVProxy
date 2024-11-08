@@ -281,6 +281,7 @@ class MPState(object):
               MPSetting('dist_unit', str, 'm', 'distance unit', choice=['m', 'nm', 'miles'], tab='Units'),
               MPSetting('height_unit', str, 'm', 'height unit', choice=['m', 'feet']),
               MPSetting('speed_unit', str, 'm/s', 'height unit', choice=['m/s', 'knots', 'mph']),
+              MPSetting('flytoframe', str, 'AboveHome', 'frame for FlyTo', choice=['AboveHome', 'AGL', 'AMSL']),
 
               MPSetting('fwdpos', bool, False, 'Forward GLOBAL_POSITION_INT on all links'),
               MPSetting('checkdelay', bool, True, 'check for link delay'),
@@ -530,7 +531,7 @@ def cmd_click(args):
         print(usage)
         return
     if args[0] == "show":
-        print("%f %f" % mpstate.click_location)
+        print("%.8f %.8f" % mpstate.click_location)
         return
     if len(args) < 2:
         print(usage)
@@ -752,8 +753,20 @@ def process_stdin(line):
     try:
         args = shlex_quotes(line)
     except Exception as e:
-        print("Caught shlex exception: %s" % e.message);
+        print("Caught shlex exception: %s" % str(e));
         return
+
+    # strip surrounding quotes - shlex leaves them in place
+    new_args = []
+    for arg in args:
+        done = False
+        new_arg = arg
+        for q in "'", '"':
+            if arg.startswith(q) and arg.endswith(q):
+                new_arg = arg[1:-1]
+                break
+        new_args.append(new_arg)
+    args = new_args
 
     cmd = args[0]
     while cmd in mpstate.aliases:
@@ -897,7 +910,7 @@ def mkdir_p(dir):
 
 def log_writer():
     '''log writing thread'''
-    while True:
+    while not mpstate.status.exit:
         mpstate.logfile_raw.write(bytearray(mpstate.logqueue_raw.get()))
         timeout = time.time() + 10
         while not mpstate.logqueue_raw.empty() and time.time() < timeout:
@@ -1103,8 +1116,11 @@ def main_loop():
 
         for master in mpstate.mav_master:
             if master.fd is None:
-                if master.port.inWaiting() > 0:
-                    process_master(master)
+                try:
+                    if master.port.inWaiting() > 0:
+                        process_master(master)
+                except serial.SerialException as e:
+                    pass
 
         periodic_tasks()
 
@@ -1231,6 +1247,29 @@ def set_mav_version(mav10, mav20, autoProtocol, mavversionArg):
         os.environ['MAVLINK20'] = '1'
         mavversion = "2"
 
+def run_startup_scripts():
+    start_scripts = []
+    if not opts.setup:
+        if 'HOME' in os.environ:
+            start_scripts.append(os.path.join(os.environ['HOME'], ".mavinit.scr"))
+        start_script = mp_util.dot_mavproxy("mavinit.scr")
+        start_scripts.append(start_script)
+    if (mpstate.settings.state_basedir is not None and
+        opts.aircraft is not None):
+        start_script = os.path.join(mpstate.aircraft_dir, "mavinit.scr")
+        start_scripts.append(start_script)
+    for start_script in start_scripts:
+        if os.path.exists(start_script):
+            print("Running script (%s)" % (start_script))
+            run_script(start_script)
+
+    if opts.aircraft is not None:
+        start_script = os.path.join(opts.aircraft, "mavinit.scr")
+        if os.path.exists(start_script):
+            run_script(start_script)
+        else:
+            print("no script %s" % start_script)
+
 if __name__ == '__main__':
     from optparse import OptionParser
     parser = OptionParser("mavproxy.py [options]")
@@ -1301,6 +1340,7 @@ if __name__ == '__main__':
     parser.add_option("--version", action='store_true', help="version information")
     parser.add_option("--default-modules", default="log,signing,wp,rally,fence,ftp,param,relay,tuneopt,arm,mode,calibration,rc,auxopt,misc,cmdlong,battery,terrain,output,adsb,layout", help='default module list')
     parser.add_option("--udp-timeout",dest="udp_timeout", default=0.0, type='float', help="Timeout for udp clients in seconds")
+    parser.add_option("--retries", type=int, help="number of times to retry connection", default=3)
 
     (opts, args) = parser.parse_args()
     if len(args) != 0:
@@ -1402,9 +1442,9 @@ if __name__ == '__main__':
     for mdev in opts.master:
         if mdev.find('?') != -1 or mdev.find('*') != -1:
             for m in glob.glob(mdev):
-                if not mpstate.module('link').link_add(m, force_connected=opts.force_connected):
+                if not mpstate.module('link').link_add(m, force_connected=opts.force_connected, retries=opts.retries):
                     sys.exit(1)
-        elif not mpstate.module('link').link_add(mdev, force_connected=opts.force_connected):
+        elif not mpstate.module('link').link_add(mdev, force_connected=opts.force_connected, retries=opts.retries):
             sys.exit(1)
 
     if not opts.master and len(serial_list) == 1:
@@ -1482,27 +1522,7 @@ if __name__ == '__main__':
     elif opts.aircraft is not None:
         mpstate.aircraft_dir = opts.aircraft
 
-    start_scripts = []
-    if not opts.setup:
-        if 'HOME' in os.environ:
-            start_scripts.append(os.path.join(os.environ['HOME'], ".mavinit.scr"))
-        start_script = mp_util.dot_mavproxy("mavinit.scr")
-        start_scripts.append(start_script)
-    if (mpstate.settings.state_basedir is not None and
-        opts.aircraft is not None):
-        start_script = os.path.join(mpstate.aircraft_dir, "mavinit.scr")
-        start_scripts.append(start_script)
-    for start_script in start_scripts:
-        if os.path.exists(start_script):
-            print("Running script (%s)" % (start_script))
-            run_script(start_script)
-
-    if opts.aircraft is not None:
-        start_script = os.path.join(opts.aircraft, "mavinit.scr")
-        if os.path.exists(start_script):
-            run_script(start_script)
-        else:
-            print("no script %s" % start_script)
+    run_startup_scripts()
 
     if opts.cmd is not None:
         for cstr in opts.cmd:
