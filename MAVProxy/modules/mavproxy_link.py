@@ -30,6 +30,7 @@ from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import mp_util
 
 if mp_util.has_wxpython:
+    from MAVProxy.modules.lib.mp_menu import MPMenuCallTextDialog
     from MAVProxy.modules.lib.mp_menu import MPMenuSubMenu
     from MAVProxy.modules.lib.mp_menu import MPMenuItem
     from MAVProxy.modules.lib.wx_addlink import MPMenulinkAddDialog
@@ -109,12 +110,28 @@ class LinkModule(mp_module.MPModule):
         self.menu_added_console = False
         if mp_util.has_wxpython:
             self.menu_rm = MPMenuSubMenu('Remove', items=[])
-            self.menu = MPMenuSubMenu('Link',
-                                      items=[MPMenuItem('Add...', 'Add...', '# link add ', handler=MPMenulinkAddDialog()),
-                                             self.menu_rm,
-                                             MPMenuItem('Ports', 'Ports', '# link ports'),
-                                             MPMenuItem('List', 'List', '# link list'),
-                                             MPMenuItem('Status', 'Status', '# link')])
+
+            items = [
+                MPMenuItem('Add...', 'Add...', '# link add ', handler=MPMenulinkAddDialog()),
+                self.menu_rm,
+                MPMenuItem('Ports', 'Ports', '# link ports'),
+                MPMenuItem('List', 'List', '# link list'),
+                MPMenuItem('Status', 'Status', '# link')]
+            # wsproto is not installed by default.
+            # Only add the menu if it's available.
+            try:
+                import wsproto  # noqa: F401
+            except ImportError:
+                pass
+            else:
+                items.append(
+                    MPMenuItem('Start Websocket Server', 'Start Websocket Server', '# output add wsserver:0.0.0.0:',
+                               handler=MPMenuCallTextDialog(
+                                   title='Websocket Port',
+                                   default=56781
+                               )))
+
+            self.menu = MPMenuSubMenu('Link', items=items)
             self.last_menu_update = 0
 
     def idle_task(self):
@@ -675,6 +692,19 @@ class LinkModule(mp_module.MPModule):
 
         return True
 
+    mav_type_planes = [
+        mavutil.mavlink.MAV_TYPE_FIXED_WING,
+        mavutil.mavlink.MAV_TYPE_VTOL_QUADROTOR,
+        mavutil.mavlink.MAV_TYPE_VTOL_TILTROTOR,
+    ]
+    # VTOL_DUOROTOR was renamed to VTOL_TAILSITTER_DUOROTOR
+    for possible_plane_type in "VTOL_DUOROTOR", "VTOL_TAILSITTER_DUOROTOR":
+        t = f"MAV_TYPE_{possible_plane_type}"
+        attr = getattr(mavutil.mavlink, t, None)
+        if attr is None:
+            continue
+        mav_type_planes.append(attr)
+
     def master_msg_handling(self, m, master):
         '''link message handling for an upstream link'''
 
@@ -739,11 +769,7 @@ class LinkModule(mp_module.MPModule):
                 self.status.last_mode_announced = master.flightmode
                 self.say("Mode " + self.status.flightmode)
 
-            if m.type in [
-                    mavutil.mavlink.MAV_TYPE_FIXED_WING,
-                    mavutil.mavlink.MAV_TYPE_VTOL_DUOROTOR,
-                    mavutil.mavlink.MAV_TYPE_VTOL_QUADROTOR,
-                    mavutil.mavlink.MAV_TYPE_VTOL_TILTROTOR]:
+            if m.type in self.mav_type_planes:
                 self.mpstate.vehicle_type = 'plane'
                 self.mpstate.vehicle_name = 'ArduPlane'
             elif m.type in [mavutil.mavlink.MAV_TYPE_GROUND_ROVER,
