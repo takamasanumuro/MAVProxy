@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 '''
 base class for modules generally transfering items using the MISSION_ITEM protocol
@@ -294,7 +294,7 @@ on'''
             self.wp_requested = {}
             self.wp_received = {}
 
-        elif mtype in ["MISSION_REQUEST"]:
+        elif mtype in frozenset(["MISSION_REQUEST", "MISSION_REQUEST_INT"]):
             self.process_waypoint_request(m, self.master)
 
     def idle_task(self):

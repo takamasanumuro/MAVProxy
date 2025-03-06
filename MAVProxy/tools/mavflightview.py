@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 '''
 view a mission log on a map
@@ -193,7 +193,7 @@ def colour_for_point(mlog, point, instance, options):
         except KeyError:
             colour_expression_exceptions[str_e] = 0
             count = 0
-        if count > 100:
+        if count > 10000:
             print("Too many exceptions processing (%s): %s" % (source, str_e))
             sys.exit(1)
         colour_expression_exceptions[str_e] += 1

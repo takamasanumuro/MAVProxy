@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 '''
 fit best estimate of magnetometer offsets, diagonals, off-diagonals, cmot and scaling using WMM target
@@ -579,6 +579,8 @@ class MagFitUI(wx.Dialog):
             att_choices.append('XKF1')
         if self.have_msg('XKY0'):
             att_choices.append('XKY0')
+        if self.have_msg('DCM'):
+            att_choices.append('DCM')
 
         orientation_choices = [ r.name for r in rotations ]
 
