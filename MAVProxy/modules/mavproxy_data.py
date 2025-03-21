@@ -47,7 +47,7 @@ def send_to_influxDB(line_protocol_buffer):
     if not line_protocol_buffer:
         return
 
-    ip = "44.221.0.169"
+    ip = "144.22.131.217"
     port = "8086"
     url = make_influx_url(ip, port, organization, bucket)
 
