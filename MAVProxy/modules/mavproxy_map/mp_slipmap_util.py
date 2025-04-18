@@ -17,6 +17,8 @@ import warnings
 from MAVProxy.modules.mavproxy_map import mp_tile
 from MAVProxy.modules.lib import mp_util
 
+font = cv2.FONT_HERSHEY_DUPLEX
+
 def image_shape(img):
     '''handle different image formats, returning (width,height) tuple'''
     if hasattr(img, 'shape'):
@@ -100,7 +102,7 @@ class SlipLabel(SlipObject):
 
     def draw_label(self, img, pixmapper):
         pix1 = pixmapper(self.point)
-        cv2.putText(img, self.label, pix1, cv2.FONT_HERSHEY_SIMPLEX, self.size, self.colour)
+        cv2.putText(img, self.label, pix1, font, self.size, self.colour)
 
     def draw(self, img, pixmapper, bounds):
         if self.hidden:
@@ -214,7 +216,7 @@ class SlipCircle(SlipObject):
 
 class SlipPolygon(SlipObject):
     '''a polygon to display on the map'''
-    def __init__(self, key, points, layer, colour, linewidth, arrow = False, popup_menu=None, showlines=True):
+    def __init__(self, key, points, layer, colour, linewidth, arrow = False, popup_menu=None, showlines=True, showcircles=True):
         SlipObject.__init__(self, key, layer, popup_menu=popup_menu)
         self.points = points
         self.colour = colour
@@ -225,6 +227,7 @@ class SlipPolygon(SlipObject):
         self._selected_vertex = None
         self._has_timestamps = False
         self._showlines = showlines
+        self._showcircles = showcircles
 
     def set_colour(self, colour):
         self.colour = colour
@@ -250,7 +253,8 @@ class SlipPolygon(SlipObject):
             return
         if self._showlines:
             cv2.line(img, pix1, pix2, colour, linewidth)
-        cv2.circle(img, pix2, linewidth*2, colour)
+        if self._showcircles:
+            cv2.circle(img, pix2, linewidth*2, colour)
         if len(self._pix_points) == 0:
             self._pix_points.append(pix1)
         self._pix_points.append(pix2)
@@ -405,7 +409,6 @@ class SlipFlightModeLegend(SlipObject):
         self.font_scale = 0.5
 
     def draw_legend(self):
-        font = cv2.FONT_HERSHEY_SIMPLEX
         fontscale = self.font_scale
         width = 0
         height = self.top_margin + self.bottom_margin
@@ -587,7 +590,7 @@ class SlipIcon(SlipThumbnail):
         img[py:py + h, px:px + w] = cv2.add(img[py:py+h, px:px+w], icon[sy:sy+h, sx:sx+w])
 
         if self.label is not None:
-            cv2.putText(img, self.label, (px,py), cv2.FONT_HERSHEY_SIMPLEX, 1.0, self.colour)
+            cv2.putText(img, self.label, (px,py), font, 1.0, self.colour)
         
         # remember where we placed it for clicked()
         self.posx = px+w//2
