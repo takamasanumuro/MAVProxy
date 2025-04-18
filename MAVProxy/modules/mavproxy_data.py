@@ -10,7 +10,7 @@ import requests
 
 # Global variables for buffering data
 data_buffer = []
-BUFFER_SIZE = 40  # Adjust buffer size as needed
+BUFFER_SIZE = 20  # Adjust buffer size as needed
 
 organization = "Innomaker"
 bucket = "Innoboat"
@@ -42,6 +42,8 @@ def make_line_protocol(bucket, tags, data):
 
     return line_protocol
 
+session = requests.Session()
+
 @time_to_send
 def send_to_influxDB(line_protocol_buffer):
     if not line_protocol_buffer:
@@ -56,7 +58,7 @@ def send_to_influxDB(line_protocol_buffer):
 
     try:
         headers = {"Authorization": f"Token {token}"}
-        response = requests.post(url, data=payload, headers=headers)
+        response = session.post(url, data=payload, headers=headers)
         #Print nothing in case of 204 (SUCCESS NO RESPONSE)
         if response.status_code != 204:
             print(f"Response: {response.text}")
@@ -107,6 +109,7 @@ class CustomModule(mp_module.MPModule):
             #Make line protocol
             add_to_buffer(payload)
 
+        '''
         if m.get_type() == 'ATTITUDE':
             roll = float(m.roll)
             pitch = float(m.pitch)
@@ -125,6 +128,7 @@ class CustomModule(mp_module.MPModule):
             }
 
             add_to_buffer(payload)
+        '''
 
 def init(mpstate):
     '''initialise module'''
